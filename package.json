@@ -1,0 +1,58 @@
+{
+  "name": "@alexpricedev/billet-mcp",
+  "version": "0.1.0",
+  "description": "A remote MCP endpoint with an OAuth 2.1 sign-in for Billet apps: dynamic client registration, PKCE, consent screen, bearer gate and a stateless /mcp handler, on its own mcp_ tables.",
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir dist --target bun --format esm --packages external && tsc -p tsconfig.build.json",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && bun test",
+    "prepublishOnly": "bun run check && bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "license": "MIT",
+  "author": "Alex Price",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexpricedev/billet-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alexpricedev/billet-mcp/issues"
+  },
+  "homepage": "https://github.com/alexpricedev/billet-mcp#readme",
+  "keywords": [
+    "mcp",
+    "oauth",
+    "oauth2",
+    "pkce",
+    "billet",
+    "bun"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}
