@@ -1,6 +1,6 @@
 {
   "name": "@alexpricedev/billet-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A remote MCP endpoint with an OAuth 2.1 sign-in for Billet apps: dynamic client registration, PKCE, consent screen, bearer gate and a stateless /mcp handler, on its own mcp_ tables.",
   "type": "module",
   "module": "dist/index.js",
