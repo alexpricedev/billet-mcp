@@ -415,3 +415,16 @@ describe("registration", () => {
     expect((await readJson(response)).error).toBe("invalid_redirect_uri");
   });
 });
+
+describe("grants", () => {
+  test("approving concurrently leaves one live grant and both codes work", async () => {
+    const { verifier, challenge } = pkcePair();
+    const [one, two] = await Promise.all([approve(challenge), approve(challenge)]);
+    // Different clients, so each has its own grant; reuse is covered in consent.test.ts.
+    expect(one.clientId).not.toBe(two.clientId);
+    expect(await sql`SELECT 1 FROM mcp_grants`).toHaveLength(2);
+    expect(
+      (await exchange(one.clientId, one.location.searchParams.get("code") as string, verifier)).status,
+    ).toBe(200);
+  });
+});

@@ -55,12 +55,15 @@ const PAGE_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
   "Cache-Control": "no-store",
   "X-Robots-Tag": "noindex",
+  // The Allow button must not be clickjackable, whatever the app wraps.
+  "X-Frame-Options": "DENY",
 };
 
 const RULE = { name: "mcp-authorize", limit: 30, windowMs: 60_000 };
 
-// The CSP and `X-Frame-Options` come from the app's `secureHeaders` wrapper: a
-// CSP set here would stop the app's full policy being applied.
+// The app's `secureHeaders` wrapper supplies the CSP. Without one, the page
+// still refuses to be framed: a CSP set here would stop the app's full policy
+// being applied, so it is only added when there is no wrapper.
 const page = (
   ctx: McpContext,
   content: ConsentPage,
@@ -68,6 +71,9 @@ const page = (
   cookies: string[] = [],
 ): Response => {
   const headers = new Headers(PAGE_HEADERS);
+  if (!ctx.options.secureHeaders) {
+    headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+  }
   for (const cookie of cookies) headers.append("Set-Cookie", cookie);
   return new Response(renderPage(ctx.options, content), { status, headers });
 };
@@ -186,7 +192,8 @@ const csrfFailure = (
   const origin = req.headers.get("origin");
   const cookie = parseCookies(req).get(MCP_CSRF_COOKIE);
   const field = form.get("csrf");
-  const originOk = origin === null || origin === ctx.issuer;
+  // Browsers send Origin on every POST, so its absence is refused too.
+  const originOk = origin === ctx.issuer;
   const tokenOk =
     typeof field === "string" &&
     field !== "" &&

@@ -61,12 +61,6 @@ const toGrant = (row: GrantRow): McpGrantRecord => ({
   revokedAt: row.revoked_at,
 });
 
-const isUniqueViolation = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) return false;
-  const code = (error as { errno?: unknown }).errno;
-  return code === "23505";
-};
-
 /**
  * Approve (or re-approve) one client for one person.
  *
@@ -95,19 +89,19 @@ export const createOrReuseGrant = async (
   const existing = await find();
   if (existing) return toGrant(existing);
 
-  try {
-    const rows = (await sql`
-      INSERT INTO mcp_grants (client_id, identity_id, scope)
-      VALUES (${input.clientId}, ${input.identityId}, ${scope})
-      RETURNING id, client_id, identity_id, scope, created_at, last_used_at, revoked_at
-    `) as GrantRow[];
-    return toGrant(rows[0]);
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    const raced = await find();
-    if (!raced) throw error;
-    return toGrant(raced);
-  }
+  // ON CONFLICT rather than catching the unique violation: inside a
+  // transaction the violation would abort it, and the re-read would fail.
+  const rows = (await sql`
+    INSERT INTO mcp_grants (client_id, identity_id, scope)
+    VALUES (${input.clientId}, ${input.identityId}, ${scope})
+    ON CONFLICT (client_id, identity_id) WHERE revoked_at IS NULL DO NOTHING
+    RETURNING id, client_id, identity_id, scope, created_at, last_used_at, revoked_at
+  `) as GrantRow[];
+  if (rows.length > 0) return toGrant(rows[0]);
+
+  const raced = await find();
+  if (!raced) throw new Error("Could not create or find the grant.");
+  return toGrant(raced);
 };
 
 export const getGrantById = async (
@@ -233,15 +227,14 @@ export const verifyAccessToken = async (
 
   // Stamped at most once a minute: an agent making several calls a turn should
   // not turn every one into an UPDATE.
-  await ctx.sql`
-    UPDATE mcp_grants
-    SET last_used_at = CURRENT_TIMESTAMP
-    WHERE id = ${row.id}
-      AND (
-        last_used_at IS NULL
-        OR last_used_at < CURRENT_TIMESTAMP - INTERVAL '60 seconds'
-      )
-  `;
+  if (
+    row.last_used_at === null ||
+    Date.now() - new Date(row.last_used_at).getTime() > 60_000
+  ) {
+    await ctx.sql`
+      UPDATE mcp_grants SET last_used_at = CURRENT_TIMESTAMP WHERE id = ${row.id}
+    `;
+  }
 
   return {
     grant: toGrant(row),
@@ -347,7 +340,7 @@ export const exchangeAuthorizationCode = async (ctx: McpContext, input: {
       JOIN mcp_grants g ON g.id = t.grant_id
       WHERE t.token_hash = ${hashToken(input.code)}
         AND t.kind = 'code'
-      FOR UPDATE
+      FOR UPDATE OF t
     `) as CodeRow[];
 
     if (rows.length === 0) {
@@ -451,7 +444,7 @@ export const rotateRefreshToken = async (ctx: McpContext, input: {
       JOIN mcp_grants g ON g.id = t.grant_id
       WHERE t.token_hash = ${hashToken(input.refreshToken)}
         AND t.kind = 'refresh'
-      FOR UPDATE
+      FOR UPDATE OF t
     `) as CodeRow[];
 
     if (rows.length === 0) {

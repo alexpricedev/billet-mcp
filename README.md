@@ -96,7 +96,7 @@ The discovery documents must be reachable at the root of your origin, so mount t
 | `findUser(id)` | The user behind a stored grant, or `null` if they are gone. It runs on every `/mcp` request, so removing a person from your app ends every token they approved. |
 | `signInUrl` | Where a signed-out browser goes to sign in. |
 | `registerTools(server, user)` | Register your tools on the per-request `McpServer`. `user` is who the token acts as. |
-| `rateLimit?(req, rule)` | Return a `Response` (usually a 429) to refuse, or `null`. Called for `mcp-register`, `mcp-authorize`, `mcp-token` (all per IP) and `mcp-tool` (`rule.key` is per grant, 120 a minute). |
+| `rateLimit?(req, rule)` | Recommended: registration and authorize are public and write rows, so without it they are unlimited. Return a `Response` (usually a 429) to refuse, or `null`. Called for `mcp-register`, `mcp-authorize`, `mcp-token` (all per IP) and `mcp-tool` (`rule.key` is per grant, 120 a minute). |
 | `secureHeaders?(req, handler)` | Wraps the two HTML routes so your CSP and friends apply. |
 | `renderPage?(page)` | Replaces the package's plain page chrome. `page.bodyHtml` is already escaped. |
 | `auditTargetKeys?` | Tool argument names kept in the audit row (default `slot`, `handle`, `id`, `url`, `revisionId`, `target`). Other arguments are never recorded. |
@@ -105,10 +105,10 @@ The package's own page uses an inline `<style>`. If your CSP forbids that, pass 
 
 ### Sign-in and coming back
 
-A signed-out visit to `/mcp/authorize` stores the pending request, sets the HttpOnly `mcp_auth` cookie (`Path=/`, ten minutes) and redirects to `signInUrl`. After your sign-in completes, send the browser on to `MCP_CONTINUE_PATH` (`/mcp/authorize/continue`) when a request is pending:
+A signed-out visit to `/mcp/authorize` stores the pending request, sets the HttpOnly `mcp_auth` cookie (`Path=/`, ten minutes) and redirects to `signInUrl`. After your sign-in completes, send the browser on to `MCP_CONTINUE_PATH` (`/mcp/authorize/continue`) when a request is pending (`hasPendingAuthorize` is false once it has expired):
 
 ```ts
-if (mcp.hasPendingAuthorize(req)) return Response.redirect(MCP_CONTINUE_PATH);
+if (await mcp.hasPendingAuthorize(req)) return Response.redirect(MCP_CONTINUE_PATH);
 ```
 
 `/mcp/authorize/continue` shows the consent screen, or redirects to `/` when there is no pending request.

@@ -55,6 +55,10 @@ describe("the consent screen", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("content-security-policy")).toBe(
+      "frame-ancestors 'none'",
+    );
     const html = await response.text();
 
     expect(html).toContain("Connect Claude &lt;b&gt;Code&lt;/b&gt;?");
@@ -96,8 +100,13 @@ describe("the consent screen", () => {
     const returning = new Request(`${APP_URL}/mcp/authorize/continue`, {
       headers: { Cookie: `mcp_auth=${row.id}` },
     });
-    expect(h.mcp.hasPendingAuthorize(returning)).toBe(true);
-    expect(h.mcp.hasPendingAuthorize(new Request(APP_URL))).toBe(false);
+    expect(await h.mcp.hasPendingAuthorize(returning)).toBe(true);
+    expect(await h.mcp.hasPendingAuthorize(new Request(APP_URL))).toBe(false);
+
+    // Once the request has expired the cookie no longer counts.
+    await sql`UPDATE mcp_auth_requests SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'`;
+    expect(await h.mcp.hasPendingAuthorize(returning)).toBe(false);
+    await sql`UPDATE mcp_auth_requests SET expires_at = CURRENT_TIMESTAMP + INTERVAL '5 minutes'`;
 
     h.session.userId = "user-1";
     const consent = await h.mcp.routes["/mcp/authorize/continue"](returning);
@@ -168,7 +177,11 @@ describe("the consent decision", () => {
   const decide = async (fields: Record<string, string>, headers: Record<string, string> = {}) =>
     h.call("/mcp/authorize", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Origin: APP_URL,
+        ...headers,
+      },
       body: new URLSearchParams(fields),
     });
 
@@ -192,6 +205,16 @@ describe("the consent decision", () => {
       { Cookie: "mcp_consent_csrf=other" },
     );
     expect(wrong.status).toBe(403);
+
+    const noOrigin = await h.call("/mcp/authorize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: `mcp_consent_csrf=${csrf}`,
+      },
+      body: new URLSearchParams({ csrf, request, decision: "approve" }),
+    });
+    expect(noOrigin.status).toBe(403);
 
     const crossSite = await decide(
       { csrf, request, decision: "approve" },

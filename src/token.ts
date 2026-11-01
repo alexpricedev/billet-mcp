@@ -14,7 +14,11 @@ import {
   type TokenPair,
 } from "./oauth/tokens";
 import type { McpContext } from "./config";
-import { limited, type RequestForm } from "./http";
+import {
+  limited,
+  oauthError as baseOauthError,
+  type RequestForm,
+} from "./http";
 
 const TOKEN_HEADERS = {
   "Cache-Control": "no-store",
@@ -26,11 +30,7 @@ const oauthError = (
   status: number,
   error: string,
   description: string,
-): Response =>
-  Response.json(
-    { error, error_description: description },
-    { status, headers: TOKEN_HEADERS },
-  );
+): Response => baseOauthError(status, error, description, TOKEN_HEADERS);
 
 const tokensResponse = (tokens: TokenPair): Response =>
   Response.json(

@@ -4,7 +4,8 @@
  * `createMcp(options)` returns the route map to mount, plus the few functions
  * an app needs around it. See the README for the seams `options` takes.
  */
-import { createContext, MCP_CONTINUE_PATH, MCP_AUTH_COOKIE, parseCookies } from "./config";
+import { createContext, MCP_AUTH_COOKIE, parseCookies } from "./config";
+import { getAuthRequest } from "./oauth/requests";
 import {
   cleanupExpiredMcpCredentials,
   listGrants,
@@ -17,10 +18,11 @@ export interface Mcp {
   /** Mount these on the app's router. */
   routes: McpRoutes;
   /**
-   * True when the request carries a pending authorize request. Call it after
+   * True when the request carries a pending authorize request that has not
+   * expired. Call it after
    * sign-in: if it is true, send the browser to `MCP_CONTINUE_PATH`.
    */
-  hasPendingAuthorize(req: Request): boolean;
+  hasPendingAuthorize(req: Request): Promise<boolean>;
   /** Revoke a grant; every token it issued stops verifying immediately. */
   revokeGrant(grantId: string, actorId: string | null): Promise<boolean>;
   /** Every consent, newest first, for a connected-apps page. */
@@ -33,7 +35,10 @@ export const createMcp = (options: McpOptions): Mcp => {
   const ctx = createContext(options);
   return {
     routes: createRoutes(ctx),
-    hasPendingAuthorize: (req) => parseCookies(req).has(MCP_AUTH_COOKIE),
+    hasPendingAuthorize: async (req) => {
+      const id = parseCookies(req).get(MCP_AUTH_COOKIE);
+      return id !== undefined && (await getAuthRequest(ctx, id)) !== null;
+    },
     revokeGrant: (grantId, actorId) => revokeGrant(ctx, grantId, actorId),
     listGrants: () => listGrants(ctx),
     cleanupExpired: () => cleanupExpiredMcpCredentials(ctx),

@@ -110,27 +110,27 @@ const createHandleMcp = (ctx: McpContext): McpHandler => {
   );
 
   return async (req) => {
-    const auth = await authenticateMcpRequest(ctx, req);
-    if (!auth.ok) return auth.response;
-
-    // Parse the call before the SDK reads the body: the clone gives us the tool
-    // name for the budget and for the audit, without changing what the handler
-    // sees.
-    const body = await readRpcBody(req);
-    if (Array.isArray(body)) return batchRefused();
-    const call = parseToolCall(body);
-    if (call) {
-      const grantId = grantIdFromAuthInfo(auth.authInfo) ?? "unknown";
-      const refused = await limited(ctx, req, {
-        name: "mcp-tool",
-        limit: TOOL_CALLS_PER_MINUTE,
-        windowMs: 60_000,
-        key: `mcp-tool:${grantId}`,
-      });
-      if (refused) return rateLimited(refused, call.id);
-    }
-
     try {
+      const auth = await authenticateMcpRequest(ctx, req);
+      if (!auth.ok) return auth.response;
+
+      // Parse the call before the SDK reads the body: the clone gives us the
+      // tool name for the budget and for the audit, without changing what the
+      // handler sees.
+      const body = await readRpcBody(req);
+      if (Array.isArray(body)) return batchRefused();
+      const call = parseToolCall(body);
+      if (call) {
+        const grantId = grantIdFromAuthInfo(auth.authInfo) ?? "unknown";
+        const refused = await limited(ctx, req, {
+          name: "mcp-tool",
+          limit: TOOL_CALLS_PER_MINUTE,
+          windowMs: 60_000,
+          key: `mcp-tool:${grantId}`,
+        });
+        if (refused) return rateLimited(refused, call.id);
+      }
+
       const response = await mcpHandler.fetch(req, {
         authInfo: auth.authInfo,
       });

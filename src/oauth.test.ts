@@ -234,6 +234,16 @@ describe("tokens", () => {
     expect(result.error).toBe("invalid_target");
   });
 
+  test("racing approvals inside transactions share one live grant", async () => {
+    const approve = () =>
+      sql.begin((tx) =>
+        createOrReuseGrant(ctx, { clientId, identityId: EDITOR.id }, tx),
+      );
+    const [a, b] = await Promise.all([approve(), approve()]);
+    expect(a.id).toBe(b.id);
+    expect(await sql`SELECT 1 FROM mcp_grants WHERE revoked_at IS NULL`).toHaveLength(1);
+  });
+
   test("a mismatched resource parameter is refused", async () => {
     const code = await mintCode((await grant()).id);
     const result = await exchangeAuthorizationCode(ctx, {
