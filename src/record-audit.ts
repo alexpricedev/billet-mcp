@@ -26,7 +26,7 @@ export const recordAudit = async (
         ${entry.actorId},
         ${entry.subjectType},
         ${entry.subjectId ?? null},
-        ${JSON.stringify(entry.detail ?? {})}::jsonb
+        ${JSON.stringify(entry.detail ?? {})}::text::jsonb
       )
     `;
   } catch (error) {

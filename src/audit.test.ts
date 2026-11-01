@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { parseToolCall, parseToolResult, targetOf } from "./audit";
+import {
+  DEFAULT_TARGET_KEYS,
+  parseToolCall,
+  parseToolResult,
+  targetOf,
+} from "./audit";
 
 describe("the tool-call audit parser", () => {
   test("reads a tools/call and ignores other methods", () => {
@@ -25,7 +30,7 @@ describe("the tool-call audit parser", () => {
 
   test("keeps target fields and never content", () => {
     expect(
-      targetOf({
+      targetOf(DEFAULT_TARGET_KEYS, {
         slot: "home.hero",
         id: "abc",
         revisionId: 3,
@@ -75,5 +80,11 @@ describe("the tool-call audit parser", () => {
         3,
       ),
     ).toEqual({ ok: false, reason: "protocol_error" });
+  });
+});
+
+describe("configurable target keys", () => {
+  test("keeps only the keys the app lists", () => {
+    expect(targetOf(["note"], { note: "n", id: "abc" })).toEqual({ note: "n" });
   });
 });

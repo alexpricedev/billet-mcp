@@ -530,6 +530,7 @@ export const rotateRefreshToken = async (ctx: McpContext, input: {
 export interface McpGrantSummary {
   id: string;
   clientId: string;
+  identityId: string;
   clientName: string;
   scope: string;
   createdAt: Date;
@@ -556,6 +557,7 @@ export const listGrants = async (ctx: McpContext): Promise<McpGrantSummary[]> =>
     id: row.id,
     clientId: row.client_id,
     clientName: row.client_name ?? "Unnamed MCP client",
+    identityId: row.identity_id,
     scope: row.scope,
     createdAt: row.created_at,
     lastUsedAt: row.last_used_at,

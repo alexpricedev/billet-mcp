@@ -219,7 +219,7 @@ export const registerClient = async (
       ${clientId},
       ${clientName},
       ${ctx.sql.array(redirectUris, "TEXT")},
-      ${JSON.stringify(metadata)}::jsonb
+      ${JSON.stringify(metadata)}::text::jsonb
     )
     RETURNING client_id, client_name, redirect_uris, created_at
   `) as ClientRow[];
